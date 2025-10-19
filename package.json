@@ -1,0 +1,47 @@
+{
+  "name": "family-movies",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "seed": "tsx scripts/seed-family-movies.ts",
+    "seed:popular": "tsx scripts/seed-popular-movies.ts",
+    "populate-providers": "tsx scripts/populate-providers.ts",
+    "db:backup": "./scripts/backup-local-db.sh",
+    "db:migrate": "npx supabase migration up --local",
+    "db:types": "npx supabase gen types typescript --local > lib/supabase/types.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^0.0.66",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "ai": "^3.4.33",
+    "csv-parse": "^6.1.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitest/ui": "^3.2.4",
+    "autoprefixer": "^10.4.0",
+    "dotenv": "^17.2.3",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.5.0",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,281 @@
+[dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+📚 Starting watch history import...
+
+Found 90 records in CSV
+
+🔍 Processing: The Princess Diaries
+  ❌ Not found on TMDB
+
+🔍 Processing: Flora & Ulysses
+  ❌ Not found on TMDB
+
+🔍 Processing: Free Birds
+  ❌ Not found on TMDB
+
+🔍 Processing: Mary Poppins Returns
+  ❌ Not found on TMDB
+
+🔍 Processing: Cloudy with a Chance of Meatballs
+  ❌ Not found on TMDB
+
+🔍 Processing: The Lego Movie
+  ❌ Not found on TMDB
+
+🔍 Processing: An American Tail
+  ❌ Not found on TMDB
+
+🔍 Processing: Sleeping Beauty
+  ❌ Not found on TMDB
+
+🔍 Processing: Turbo
+  ❌ Not found on TMDB
+
+🔍 Processing: Frozen II
+  ❌ Not found on TMDB
+
+🔍 Processing: Horton Hears a Who!
+  ❌ Not found on TMDB
+
+🔍 Processing: Epic
+  ❌ Not found on TMDB
+
+🔍 Processing: Moana
+  ❌ Not found on TMDB
+
+🔍 Processing: Ratatouille
+  ❌ Not found on TMDB
+
+🔍 Processing: How to Train your Dragon
+  ❌ Not found on TMDB
+
+🔍 Processing: Nim's Island
+  ❌ Not found on TMDB
+
+🔍 Processing: Flow
+  ❌ Not found on TMDB
+
+🔍 Processing: The Sound of Music
+  ❌ Not found on TMDB
+
+🔍 Processing: Leap!
+  ❌ Not found on TMDB
+
+🔍 Processing: Finding Dory
+  ❌ Not found on TMDB
+
+🔍 Processing: Paddington
+  ❌ Not found on TMDB
+
+🔍 Processing: Migration
+  ❌ Not found on TMDB
+
+🔍 Processing: The Boy, the Mole, the Fox and the Horse
+  ❌ Not found on TMDB
+
+🔍 Processing: Bambi
+  ❌ Not found on TMDB
+
+🔍 Processing: Cars
+  ❌ Not found on TMDB
+
+🔍 Processing: Tangled
+  ❌ Not found on TMDB
+
+🔍 Processing: Zootopia
+  ❌ Not found on TMDB
+
+🔍 Processing: Snow White and the Seven Dwarfs
+  ❌ Not found on TMDB
+
+🔍 Processing: Peter Pan
+  ❌ Not found on TMDB
+
+🔍 Processing: Monsters, Inc.
+  ❌ Not found on TMDB
+
+🔍 Processing: The Super Mario Bros. Movie
+  ❌ Not found on TMDB
+
+🔍 Processing: Frozen
+  ❌ Not found on TMDB
+
+🔍 Processing: Harold and the Purple Crayon
+  ❌ Not found on TMDB
+
+🔍 Processing: Winnie the Pooh
+  ❌ Not found on TMDB
+
+🔍 Processing: The Little Mermaid
+  ❌ Not found on TMDB
+
+🔍 Processing: Inside Out 2
+  ❌ Not found on TMDB
+
+🔍 Processing: Paddington 2
+  ❌ Not found on TMDB
+
+🔍 Processing: Inside Out
+  ❌ Not found on TMDB
+
+🔍 Processing: Wonka
+  ❌ Not found on TMDB
+
+🔍 Processing: Encanto
+  ❌ Not found on TMDB
+
+🔍 Processing: The Muppets (2011)
+  ❌ Not found on TMDB
+
+🔍 Processing: Finding Nemo
+  ❌ Not found on TMDB
+
+🔍 Processing: Heidi
+  ❌ Not found on TMDB
+
+🔍 Processing: Bedknobs and Broomsticks
+  ❌ Not found on TMDB
+
+🔍 Processing: One Hundred and One Dalmatians
+  ❌ Not found on TMDB
+
+🔍 Processing: Rio
+  ❌ Not found on TMDB
+
+🔍 Processing: The Aristocats
+  ❌ Not found on TMDB
+
+🔍 Processing: The One and Only Ivan
+  ❌ Not found on TMDB
+
+🔍 Processing: Peter Rabbit
+  ❌ Not found on TMDB
+
+🔍 Processing: Honey, I Shrunk the Kids
+  ❌ Not found on TMDB
+
+🔍 Processing: Sing
+  ❌ Not found on TMDB
+
+🔍 Processing: Ice Age
+  ❌ Not found on TMDB
+
+🔍 Processing: Mary Poppins
+  ❌ Not found on TMDB
+
+🔍 Processing: WALL-E
+  ❌ Not found on TMDB
+
+🔍 Processing: The Croods
+  ❌ Not found on TMDB
+
+🔍 Processing: Sing 2
+  ❌ Not found on TMDB
+
+🔍 Processing: Beauty and the Beast
+  ❌ Not found on TMDB
+
+🔍 Processing: The Mitchells vs the Machines
+  ❌ Not found on TMDB
+
+🔍 Processing: Ballerina
+  ❌ Not found on TMDB
+
+🔍 Processing: Arthur Christmas
+  ❌ Not found on TMDB
+
+🔍 Processing: Toy Story
+  ❌ Not found on TMDB
+
+🔍 Processing: Pocahontas
+  ❌ Not found on TMDB
+
+🔍 Processing: The Wild Robot
+  ❌ Not found on TMDB
+
+🔍 Processing: The Lion King
+  ❌ Not found on TMDB
+
+🔍 Processing: Rio 2
+  ❌ Not found on TMDB
+
+🔍 Processing: Puss in Boots
+  ❌ Not found on TMDB
+
+🔍 Processing: The Jungle Book
+  ❌ Not found on TMDB
+
+🔍 Processing: Ferdinand
+  ❌ Not found on TMDB
+
+🔍 Processing: Cinderella
+  ❌ Not found on TMDB
+
+🔍 Processing: Smallfoot
+  ❌ Not found on TMDB
+
+🔍 Processing: Fly Away Home
+  ❌ Not found on TMDB
+
+🔍 Processing: One Hundred and One Dalmatians
+  ❌ Not found on TMDB
+
+🔍 Processing: Wreck-It Ralph
+  ❌ Not found on TMDB
+
+🔍 Processing: The Incredibles
+  ❌ Not found on TMDB
+
+🔍 Processing: Madagascar
+  ❌ Not found on TMDB
+
+🔍 Processing: Elf
+  ❌ Not found on TMDB
+
+🔍 Processing: The Sword in the Stone
+  ❌ Not found on TMDB
+
+🔍 Processing: Robin Hood
+  ❌ Not found on TMDB
+
+🔍 Processing: Babe
+  ❌ Not found on TMDB
+
+🔍 Processing: The Sound of Music
+  ❌ Not found on TMDB
+
+🔍 Processing: Angels in the Outfield
+  ❌ Not found on TMDB
+
+🔍 Processing: Encanto
+  ❌ Not found on TMDB
+
+🔍 Processing: Jingle Jangle: A Christmas Journey
+  ❌ Not found on TMDB
+
+🔍 Processing: Cinderella
+  ❌ Not found on TMDB
+
+🔍 Processing: Lady and the Tramp
+  ❌ Not found on TMDB
+
+🔍 Processing: Up
+  ❌ Not found on TMDB
+
+🔍 Processing: Night at the Museum The Smithsonian
+  ❌ Not found on TMDB
+
+🔍 Processing: Moana 2
+  ❌ Not found on TMDB
+
+🔍 Processing: Enchanted
+  ❌ Not found on TMDB
+
+🔍 Processing: Night at the Museum
+  ❌ Not found on TMDB
+
+
+📊 Import Summary:
+  ✅ Imported: 0
+  ⏭️  Skipped (not in DB): 90
+  ❌ Errors: 0
+  📝 Total: 90
