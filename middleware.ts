@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/signup', '/auth/callback'];
+  const publicRoutes = ['/login', '/signup', '/auth/callback', '/beta', '/api/beta-auth'];
 
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
@@ -23,6 +23,17 @@ export async function middleware(request: NextRequest) {
 
   // Create a response we can add cookies to (Edge-compatible)
   let response = NextResponse.next();
+
+  // Optional beta gate: require simple shared credentials to access the app
+  const betaEnabled = process.env.BETA_MODE !== 'false';
+  if (betaEnabled) {
+    const betaCookie = request.cookies.get('beta_auth')?.value;
+    if (!betaCookie) {
+      const betaUrl = new URL('/beta', request.url);
+      betaUrl.searchParams.set('next', pathname);
+      return NextResponse.redirect(betaUrl);
+    }
+  }
 
   // Create Supabase client that works in Middleware (Edge runtime)
   const supabase = createServerClient<Database>(
