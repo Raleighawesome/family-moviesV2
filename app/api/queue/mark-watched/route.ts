@@ -46,22 +46,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No profile found' }, { status: 404 });
     }
 
-    // Get movie data
-    const { data: movie } = await supabase
-      .from('movies')
-      .select('id')
-      .eq('tmdb_id', tmdbId)
-      .single();
-
-    if (!movie) {
-      return NextResponse.json({ error: 'Movie not found' }, { status: 404 });
-    }
-
-    // Insert watch record
+    // Insert watch record (schema uses tmdb_id, not movie_id)
     const { error: watchError } = await supabase.from('watches').insert({
       household_id: householdMember.household_id,
       profile_id: profile.id,
-      movie_id: movie.id,
+      tmdb_id: tmdbId,
       watched_at: new Date().toISOString(),
     });
 
@@ -75,12 +64,14 @@ export async function POST(req: Request) {
 
     // Insert rating if provided (1-10 scale)
     if (rating && rating >= 1 && rating <= 10) {
-      const { error: ratingError } = await supabase.from('ratings').insert({
-        household_id: householdMember.household_id,
-        profile_id: profile.id,
-        movie_id: movie.id,
-        rating,
-      });
+      const { error: ratingError } = await supabase
+        .from('ratings')
+        .insert({
+          household_id: householdMember.household_id,
+          profile_id: profile.id,
+          tmdb_id: tmdbId,
+          rating,
+        });
 
       if (ratingError) {
         console.error('Error creating rating:', ratingError);
@@ -90,7 +81,7 @@ export async function POST(req: Request) {
       // If rating is 4+, refresh taste vector
       if (rating >= 4) {
         try {
-          await supabase.rpc('refresh_household_taste', {
+          await supabase.rpc('refresh_family_taste', {
             p_household_id: householdMember.household_id,
           });
         } catch (tasteError) {

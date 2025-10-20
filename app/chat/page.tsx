@@ -159,6 +159,10 @@ export default function ChatPage() {
           const isMarkWatchedFlow = !!message.toolInvocations?.some(
             (t: any) => t.toolName === 'mark_watched'
           );
+          const isRecommendFlow = !!message.toolInvocations?.some(
+            (t: any) => t.toolName === 'recommend'
+          );
+          const suppressAssistantBubble = message.role === 'assistant' && isRecommendFlow && movies.length > 0;
 
           return (
             <div
@@ -172,53 +176,55 @@ export default function ChatPage() {
                   message.role === 'user' ? 'max-w-3xl' : 'w-full'
                 }`}
               >
-                <div
-                  className={`rounded-lg px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white inline-block'
-                      : 'bg-white text-gray-900 border border-gray-200'
-                  }`}
-                >
-                  <div className="text-sm whitespace-pre-wrap">
-                    {(() => {
-                      if (message.role !== 'assistant') return message.content;
+                {!suppressAssistantBubble && (
+                  <div
+                    className={`rounded-lg px-4 py-3 ${
+                      message.role === 'user'
+                        ? 'bg-blue-600 text-white inline-block'
+                        : 'bg-white text-gray-900 border border-gray-200'
+                    }`}
+                  >
+                    <div className="text-sm whitespace-pre-wrap">
+                      {(() => {
+                        if (message.role !== 'assistant') return message.content;
 
-                      // If this turn recorded a watch, prefer the tool's confirmation message
-                      const mw = message.toolInvocations?.find(
-                        (t: any) => t.toolName === 'mark_watched' && t.state === 'result' && t.result?.message
-                      );
-                      if (mw) return mw.result.message;
+                        // If this turn recorded a watch, prefer the tool's confirmation message
+                        const mw = message.toolInvocations?.find(
+                          (t: any) => t.toolName === 'mark_watched' && t.state === 'result' && t.result?.message
+                        );
+                        if (mw) return mw.result.message;
 
-                      return cleanMessageContent(message.content, movies.length > 0);
-                    })()}
-                  </div>
-
-                  {/* Display tool invocations if any */}
-                  {message.toolInvocations && message.toolInvocations.length > 0 && !isMarkWatchedFlow && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                      {message.toolInvocations.map((tool, idx) => (
-                        <div key={idx} className="text-xs text-gray-600">
-                          <span className="font-semibold">
-                            {tool.toolName === 'tmdb_search' && '🔍 Searching movies...'}
-                            {tool.toolName === 'add_to_queue' && '➕ Adding to queue...'}
-                            {tool.toolName === 'recommend' && '✨ Getting recommendations...'}
-                            {tool.toolName === 'mark_watched' && '✅ Recording watch...'}
-                            {tool.toolName === 'get_streaming' && '📺 Getting streaming info...'}
-                          </span>
-                          {tool.state === 'result' && tool.result && (
-                            <div className="mt-1 text-gray-500">
-                              {typeof tool.result === 'object' && 'success' in tool.result
-                                ? tool.result.success
-                                  ? '✓ Done'
-                                  : `✗ ${tool.result.error || 'Failed'}`
-                                : '✓ Complete'}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        return cleanMessageContent(message.content, movies.length > 0);
+                      })()}
                     </div>
-                  )}
-                </div>
+
+                    {/* Display tool invocations if any */}
+                    {message.toolInvocations && message.toolInvocations.length > 0 && !isMarkWatchedFlow && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                        {message.toolInvocations.map((tool: any, idx: number) => (
+                          <div key={idx} className="text-xs text-gray-600">
+                            <span className="font-semibold">
+                              {tool.toolName === 'tmdb_search' && '🔍 Searching movies...'}
+                              {tool.toolName === 'add_to_queue' && '➕ Adding to queue...'}
+                              {tool.toolName === 'recommend' && '✨ Getting recommendations...'}
+                              {tool.toolName === 'mark_watched' && '✅ Recording watch...'}
+                              {tool.toolName === 'get_streaming' && '📺 Getting streaming info...'}
+                            </span>
+                            {tool.state === 'result' && (tool as any).result && (
+                              <div className="mt-1 text-gray-500">
+                                {typeof (tool as any).result === 'object' && 'success' in (tool as any).result
+                                  ? (tool as any).result.success
+                                    ? '✓ Done'
+                                    : `✗ ${(tool as any).result.error || 'Failed'}`
+                                  : '✓ Complete'}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Render movie cards if movies were found */}
                 {movies.length > 0 && (
@@ -261,7 +267,7 @@ export default function ChatPage() {
             onChange={handleInputChange}
             placeholder="Ask about movies..."
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
           <button
             type="submit"

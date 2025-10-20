@@ -204,7 +204,7 @@ export default function SettingsPage() {
                 type="text"
                 value={householdName}
                 disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 cursor-not-allowed"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Contact support to change your household name
@@ -295,7 +295,7 @@ export default function SettingsPage() {
             <select
               value={rewatchExclusionDays}
               onChange={(e) => setRewatchExclusionDays(parseInt(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="0">Always allow rewatches</option>
               <option value="30">1 month</option>
@@ -324,7 +324,7 @@ export default function SettingsPage() {
               onChange={(e) => setBlockedKeywords(e.target.value)}
               placeholder="e.g., violence, horror, scary"
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 

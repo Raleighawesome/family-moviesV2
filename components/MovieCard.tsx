@@ -9,7 +9,6 @@ interface Provider {
 }
 
 interface Movie {
-  id: number;
   tmdb_id: number;
   title: string;
   year: number;

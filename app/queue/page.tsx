@@ -32,7 +32,6 @@ export default async function QueuePage() {
       tmdb_id,
       created_at,
       movies (
-        id,
         tmdb_id,
         title,
         year,

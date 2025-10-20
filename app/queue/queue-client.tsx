@@ -6,7 +6,6 @@ import { MovieCard } from '@/components/MovieCard';
 import { RatingStars } from '@/components/RatingStars';
 
 interface Movie {
-  id: number;
   tmdb_id: number;
   title: string;
   year: number;
@@ -17,7 +16,7 @@ interface Movie {
 }
 
 interface QueueItem {
-  id: string;
+  id: number;
   tmdb_id: number;
   created_at: string;
   movies: Movie;
@@ -29,15 +28,15 @@ interface QueueClientProps {
 
 export function QueueClient({ queueItems }: QueueClientProps) {
   const router = useRouter();
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState<{
-    itemId: string;
+    itemId: number;
     movie: Movie;
   } | null>(null);
   const [rating, setRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleRemove = async (itemId: string) => {
+  const handleRemove = async (itemId: number) => {
     if (!confirm('Remove this movie from your queue?')) return;
 
     setRemovingId(itemId);
@@ -59,7 +58,7 @@ export function QueueClient({ queueItems }: QueueClientProps) {
     }
   };
 
-  const handleMarkWatched = (itemId: string, movie: Movie) => {
+  const handleMarkWatched = (itemId: number, movie: Movie) => {
     setShowRatingModal({ itemId, movie });
     setRating(0);
   };
@@ -102,7 +101,6 @@ export function QueueClient({ queueItems }: QueueClientProps) {
             <MovieCard
               key={item.id}
               movie={{
-                id: movie.id,
                 tmdb_id: movie.tmdb_id,
                 title: movie.title,
                 year: movie.year,

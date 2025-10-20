@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/lib/supabase/types';
 
 /**
  * Middleware to protect routes and manage authentication
@@ -20,8 +21,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Create a response we can add cookies to (Edge-compatible)
+  let response = NextResponse.next();
+
+  // Create Supabase client that works in Middleware (Edge runtime)
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          // Use request cookies in middleware
+          return request.cookies.getAll();
+        },
+        setAll(cookies) {
+          // Write any auth cookie updates to the response
+          cookies.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
   // Check authentication for protected routes
-  const supabase = await createClient();
   const {
     data: { user },
     error,
@@ -31,11 +54,12 @@ export async function middleware(request: NextRequest) {
     // User is not authenticated, redirect to login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl);
+    response = NextResponse.redirect(loginUrl);
+    return response;
   }
 
   // User is authenticated, allow the request to continue
-  return NextResponse.next();
+  return response;
 }
 
 /**
