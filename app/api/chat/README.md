@@ -35,7 +35,7 @@ The endpoint returns a streaming response using the Vercel AI SDK's data stream 
 
 ## Available Tools
 
-The AI has access to 4 tools:
+The AI has access to these tools:
 
 ### 1. tmdb_search
 Search for movies by title and optional year.
@@ -93,14 +93,14 @@ Mark a movie as watched with optional rating.
 ```typescript
 {
   tmdb_id: number;  // TMDB movie ID
-  rating?: number;  // Optional rating 1-5
+  rating?: number;  // Optional rating 1-10
 }
 ```
 
 **Example:**
 ```
-User: "We watched The Lion King, it was amazing - 5 stars!"
-AI calls: mark_watched({ tmdb_id: 8587, rating: 5 })
+User: "We watched The Lion King, it was amazing - 9 stars!"
+AI calls: mark_watched({ tmdb_id: 8587, rating: 9 })
 ```
 
 ## System Prompt

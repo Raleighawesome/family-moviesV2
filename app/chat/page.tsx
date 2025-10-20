@@ -22,6 +22,14 @@ export default function ChatPage() {
   const extractMoviesFromMessage = (message: any) => {
     if (!message.toolInvocations) return [];
 
+    // If this assistant turn handled a "mark_watched" action, suppress
+    // rendering of search/recommendation movie cards. The user intent was to
+    // record a watch, not to browse candidates.
+    const executedMarkWatched = message.toolInvocations.some(
+      (tool: any) => tool.toolName === 'mark_watched'
+    );
+    if (executedMarkWatched) return [];
+
     const movies: any[] = [];
     const streamingData: Record<number, any> = {};
     const reasonsMap: Record<string, string> = {};
@@ -148,6 +156,9 @@ export default function ChatPage() {
 
         {messages.map((message) => {
           const movies = message.role === 'assistant' ? extractMoviesFromMessage(message) : [];
+          const isMarkWatchedFlow = !!message.toolInvocations?.some(
+            (t: any) => t.toolName === 'mark_watched'
+          );
 
           return (
             <div
@@ -169,13 +180,21 @@ export default function ChatPage() {
                   }`}
                 >
                   <div className="text-sm whitespace-pre-wrap">
-                    {message.role === 'assistant'
-                      ? cleanMessageContent(message.content, movies.length > 0)
-                      : message.content}
+                    {(() => {
+                      if (message.role !== 'assistant') return message.content;
+
+                      // If this turn recorded a watch, prefer the tool's confirmation message
+                      const mw = message.toolInvocations?.find(
+                        (t: any) => t.toolName === 'mark_watched' && t.state === 'result' && t.result?.message
+                      );
+                      if (mw) return mw.result.message;
+
+                      return cleanMessageContent(message.content, movies.length > 0);
+                    })()}
                   </div>
 
                   {/* Display tool invocations if any */}
-                  {message.toolInvocations && message.toolInvocations.length > 0 && (
+                  {message.toolInvocations && message.toolInvocations.length > 0 && !isMarkWatchedFlow && (
                     <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                       {message.toolInvocations.map((tool, idx) => (
                         <div key={idx} className="text-xs text-gray-600">

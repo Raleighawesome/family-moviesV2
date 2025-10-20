@@ -155,8 +155,8 @@ export async function markWatched(
     }
 
     // Refresh family taste vector (this updates personalized recommendations)
-    // Only refresh if a rating was provided (ratings >= 4 stars influence taste)
-    if (rating !== undefined && rating >= 4) {
+    // Only refresh if a rating was provided and is high (>= 8/10)
+    if (rating !== undefined && rating >= 8) {
       try {
         await supabase.rpc('refresh_family_taste', {
           p_household_id: householdId,
@@ -168,11 +168,19 @@ export async function markWatched(
       }
     }
 
-    // Build result message
-    let message = `Marked "${movie.title}"${movie.year ? ` (${movie.year})` : ''} as watched`;
+    // Build result message (include watched date if provided)
+    const watchedAtDate = watched_at ? new Date(watched_at) : new Date();
+    const watchedDateStr = watchedAtDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    let message = `I've marked "${movie.title}"${movie.year ? ` (${movie.year})` : ''} as watched on ${watchedDateStr}`;
     if (rating !== undefined) {
-      message += ` with ${rating} star${rating !== 1 ? 's' : ''}`;
+      message += `, with a rating of ${rating} star${rating !== 1 ? 's' : ''}`;
     }
+    message += '.';
 
     return {
       success: true,

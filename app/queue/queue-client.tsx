@@ -146,7 +146,7 @@ export function QueueClient({ queueItems }: QueueClientProps) {
                 Rate this movie (optional):
               </label>
               <div className="flex justify-center">
-                <RatingStars rating={rating} onChange={setRating} size="lg" />
+                <RatingStars rating={rating} onChange={setRating} size="lg" maxStars={10} />
               </div>
               {rating > 0 && (
                 <p className="text-center text-sm text-gray-600 mt-2">

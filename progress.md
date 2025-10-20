@@ -136,14 +136,14 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    - Primary key: `id` (bigserial)
    - Fields: profile_id, tmdb_id, watched_at, rewatch (boolean)
 
-9. **`ratings`** - 1-5 star ratings
+9. **`ratings`** - 1–10 star ratings
    - Composite key: `(household_id, profile_id, tmdb_id)`
-   - Constraint: rating BETWEEN 1 AND 5
+  - Constraint: rating BETWEEN 1 AND 10
 
 10. **`family_taste`** - Collaborative filtering vector
     - Primary key: `household_id`
     - Fields: `taste` vector(1536), updated_at
-    - Computed from movies rated ≥4 stars
+  - Computed from movies rated ≥8/10
 
 **Security Functions:**
 ```sql
@@ -161,7 +161,7 @@ user_households() → setof uuid
 
 **Stored Procedures:**
 ```sql
--- Recompute taste vector from high ratings (≥4 stars)
+-- Recompute taste vector from high ratings (≥8/10)
 refresh_family_taste(household_id uuid) → void
 
 -- Get personalized recommendations with filters applied
@@ -465,7 +465,7 @@ family-moviesV2/
 - ✅ Automatic household filter application (allowed ratings, max runtime)
 - ✅ Embedding generation when adding movies
 - ✅ Smart duplicate detection (queue, watches)
-- ✅ Taste vector refresh on high ratings (4-5 stars)
+- ✅ Taste vector refresh on high ratings (8–10 stars)
 - ✅ Watch provider integration
 - ✅ Comprehensive error handling with custom error types
 - ✅ TypeScript type safety throughout
@@ -479,7 +479,7 @@ family-moviesV2/
 4. User: "Add it to my queue"
 5. AI calls `addToQueue({ tmdb_id: 8587 })`
 6. Fetches from TMDB, generates embedding, saves to DB, adds to queue
-7. User: "We watched it, 5 stars!"
+7. User: "We watched it, 9/10 stars!"
 8. AI calls `markWatched({ tmdb_id: 8587, rating: 5 })`
 9. Records watch, saves rating, refreshes taste vector for better recommendations
 
@@ -543,10 +543,10 @@ AI: *calls add_to_queue({ tmdb_id: 10681 })*
 AI: *fetches from TMDB, generates embedding, saves to DB*
 AI: "Added 'WALL-E' (2008) to your queue!"
 
-User: "We watched it last night, 5 stars!"
+User: "We watched it last night, 9/10 stars!"
 AI: *calls mark_watched({ tmdb_id: 10681, rating: 5 })*
 AI: *records watch, saves rating, refreshes taste vector*
-AI: "Awesome! I've recorded that you watched 'WALL-E' with 5 stars..."
+AI: "Awesome! I've recorded that you watched 'WALL-E' with 9/10 stars..."
 ```
 
 **Notes:**
@@ -665,7 +665,7 @@ AI: "Awesome! I've recorded that you watched 'WALL-E' with 5 stars..."
   - Props: movie, actions (Add/Watch/Rate/Remove)
   - Shows: poster, title (year), MPAA, runtime, genres, providers
 - `components/ProviderChips.tsx` - Streaming service badges
-- `components/RatingStars.tsx` - 1-5 star rating input/display
+- `components/RatingStars.tsx` - 1–10 star rating input/display
 - `components/ChatMessage.tsx` - AI chat bubble with tool results
 
 ---

@@ -73,8 +73,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insert rating if provided
-    if (rating && rating >= 1 && rating <= 5) {
+    // Insert rating if provided (1-10 scale)
+    if (rating && rating >= 1 && rating <= 10) {
       const { error: ratingError } = await supabase.from('ratings').insert({
         household_id: householdMember.household_id,
         profile_id: profile.id,

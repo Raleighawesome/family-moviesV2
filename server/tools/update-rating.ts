@@ -116,8 +116,8 @@ export async function updateRating(
     console.log('[update-rating] Rating updated successfully');
 
     // Refresh family taste vector (this updates personalized recommendations)
-    // Only refresh if rating >= 4 stars (ratings >= 4 influence taste)
-    if (rating >= 4) {
+    // Only refresh if rating is high (>= 8/10)
+    if (rating >= 8) {
       try {
         await supabase.rpc('refresh_family_taste', {
           p_household_id: householdId,

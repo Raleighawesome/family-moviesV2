@@ -54,7 +54,7 @@ Else: popularity-weighted, filter-constrained subset from your local catalog (or
 Always join cached provider availability for the household’s region.
 6.4 Mark Watched / Rate
 Chat: “we watched The Iron Giant, 5/5” → inserts watches, ratings; recompute household taste (mean of ≥4 ratings).
-UI affordance on cards: Mark watched + 1–5 rating.
+UI affordance on cards: Mark watched + 1–10 rating.
 6.5 Household Preferences
 allowed_ratings[], max_runtime, blocked_keywords[] stored in DB.
 Applied in every read path (recommendations, queue listing).
@@ -150,7 +150,7 @@ create table public.ratings (
   household_id uuid not null references public.households on delete cascade,
   profile_id uuid references public.profiles on delete set null,
   tmdb_id integer not null references public.movies(tmdb_id) on delete cascade,
-  rating int not null check (rating between 1 and 5),
+  rating int not null check (rating between 1 and 10),
   rated_at timestamptz not null default now(),
   primary key (household_id, profile_id, tmdb_id)
 );

@@ -155,8 +155,8 @@
 
 ### 11.3: RatingStars Component
 - [ ] Create `components/RatingStars.tsx`
-  - [ ] Props: `rating` (1-5), `onChange` (optional)
-  - [ ] Display: 5 stars (filled/empty)
+  - [ ] Props: `rating` (1-10), `onChange` (optional)
+  - [ ] Display: 10 stars (filled/empty)
   - [ ] Interactive mode: click to rate
   - [ ] Read-only mode: just display
   - [ ] Keyboard accessible (arrow keys)

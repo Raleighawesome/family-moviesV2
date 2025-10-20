@@ -53,11 +53,11 @@ async function seedMovie(tmdbId: number): Promise<boolean> {
       movieData.keywords.keywords?.map(k => k.name) || []
     );
 
-    // Filter out explicitly non-family-friendly ratings
-    // Allow: G, PG, PG-13, and NR/null (unrated - will rely on genre filtering)
-    // Block: R, NC-17, and other adult ratings
-    const blockedRatings = ['R', 'NC-17', 'X', 'Unrated'];
-    if (normalizedMovie.rating && blockedRatings.includes(normalizedMovie.rating)) {
+    // Strict family-friendly rating filter
+    // ONLY allow: G, PG, PG-13, and unrated/null movies
+    // Block everything else: R, NC-17, X, TV-MA, etc.
+    const allowedRatings = ['G', 'PG', 'PG-13'];
+    if (normalizedMovie.mpaa && !allowedRatings.includes(normalizedMovie.mpaa)) {
       stats.filteredContent++;
       return false;
     }

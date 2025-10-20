@@ -1,0 +1,59 @@
+# Codex CLI Rules — Family Movies v2
+
+Project‑specific and safety rules for working in this repo with Codex CLI.
+
+## Database Safety — CRITICAL
+- Never run destructive DB commands without explicit user approval:
+  - `supabase db reset` (any variant), `DROP DATABASE`, `TRUNCATE TABLE`, mass deletes.
+- Before any schema change:
+  1) Create a backup: `./scripts/backup-local-db.sh`
+  2) Use migrations only: `npx supabase migration new <description>` → edit SQL → `npx supabase migration up --local`
+  3) Regenerate types if schema changed: `npx supabase gen types typescript --local > lib/supabase/types.ts`
+- If a reset is absolutely required: ask user, make a backup, confirm understanding of data loss, then proceed.
+
+## Ratings (Product Rule)
+- All ratings are 1–10 stars. Do not scale to/from 5.
+- If a user says a single number (e.g., “5”), interpret as 5/10.
+- Use `update_rating` to change existing ratings; use `mark_watched` to record new watches (optionally with rating/notes/date).
+- High‑rating threshold for taste updates is ≥ 8/10.
+
+## AI Tools & Data Flow
+- The AI should act only via server tools (do not fabricate data):
+  - `tmdb_search`, `add_to_queue`, `recommend`, `mark_watched`, `update_rating`, `get_streaming` in `server/tools`.
+- Always show streaming availability by consulting cached `movie_providers` (region‑scoped) via `get_streaming`.
+- Respect household preferences everywhere: allowed ratings, max runtime, blocked keywords, rewatch exclusion, preferred services.
+
+## Security & Privacy
+- RLS is enforced on household‑scoped tables. Never bypass RLS.
+- Never expose the Supabase service role key to the client.
+- Assume multi‑tenant isolation; avoid cross‑household leakage.
+
+## Editing & Commands (Codex CLI)
+- File edits: use `apply_patch` only. Do not write directly to files.
+- Plans: use `update_plan` for multi‑step tasks; exactly one `in_progress` step; keep steps concise.
+- Shell usage:
+  - Prefer `rg` for search; read files in ≤250‑line chunks.
+  - Be mindful of sandbox and approvals; request escalations only when necessary.
+  - Avoid long/truncated outputs; target specific files/lines.
+- Do not run `git commit` or create branches unless the user requests it.
+- Keep changes minimal, focused, and consistent with codebase style.
+
+## Testing & Validation
+- If tests/builds exist and approvals allow, run them to validate changes.
+- Start with the narrowest tests relevant to your changes; do not fix unrelated tests.
+- Formatting: prefer existing project formatters if configured; don’t add new ones.
+
+## UI & Components
+- `RatingStars` must support 10‑star scale where appropriate.
+- `MovieCard`/`MovieResults` surface MPAA, runtime, genres, and providers.
+- Provider logos load via `https://image.tmdb.org/t/p/w92${logo_path}` and derive from `movie_providers` cache.
+
+## Middleware & Auth
+- Protected routes require auth; unauthenticated users are redirected to `/login`.
+- `/auth/callback` may create household/membership for new users.
+- Use Supabase clients from `lib/supabase` (`server` for server routes/components; `client` for browser).
+
+## When Unsure
+- If an operation could delete or reset data, stop and ask the user first.
+- Prefer migrations and backups over resets. Prefer tools over ad‑hoc queries.
+
