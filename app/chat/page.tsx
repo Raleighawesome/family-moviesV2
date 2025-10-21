@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from 'ai/react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MovieResults } from '@/components/MovieResults';
 
 export default function ChatPage() {
@@ -18,66 +18,83 @@ export default function ChatPage() {
     }
   };
 
-  // Extract movie data from tool invocations
-  const extractMoviesFromMessage = (message: any) => {
-    if (!message.toolInvocations) return [];
-
-    // If this assistant turn handled a "mark_watched" action, suppress
-    // rendering of search/recommendation movie cards. The user intent was to
-    // record a watch, not to browse candidates.
-    const executedMarkWatched = message.toolInvocations.some(
-      (tool: any) => tool.toolName === 'mark_watched'
-    );
-    if (executedMarkWatched) return [];
-
-    const movies: any[] = [];
-    const streamingData: Record<number, any> = {};
-    const reasonsMap: Record<string, string> = {};
-
-    // Parse reasons from the AI's text content
-    // Looking for patterns like:
-    // 1. "**Onward (2020)**" - A magical adventure with heartwarming themes.
-    // 2. **Robin Hood (1973)** - A classic animated tale of heroism and adventure.
-    if (message.content) {
-      const reasonPattern = /\d+\.\s+\*\*(.+?)\s*\((\d{4})\)\*\*\s*-\s*(.+?)(?:\n|$)/g;
-      let match;
-      while ((match = reasonPattern.exec(message.content)) !== null) {
-        const title = match[1].trim();
-        const year = match[2];
-        const reason = match[3].trim();
-        const key = `${title}|${year}`;
-        reasonsMap[key] = reason;
-      }
+  // Aggregate movie data across the current assistant "turn"
+  // We wait until all data (reasons + streaming) is available, then render once.
+  const aggregateTurnMovies = (currentIndex: number) => {
+    // Find the start of the current turn (after the last user message)
+    let start = 0;
+    for (let i = currentIndex; i >= 0; i--) {
+      if (messages[i]?.role === 'user') { start = i + 1; break; }
+      if (i === 0) start = 0;
     }
 
-    // First pass: collect streaming data
-    message.toolInvocations.forEach((tool: any) => {
-      if (tool.toolName === 'get_streaming' && tool.state === 'result' && tool.result?.providers) {
-        const tmdbId = tool.args?.tmdb_id;
-        if (tmdbId) {
-          streamingData[tmdbId] = tool.result.providers;
+    // Find the end of the current turn (before the next user message)
+    let end = messages.length - 1;
+    for (let j = currentIndex + 1; j < messages.length; j++) {
+      if (messages[j]?.role === 'user') { end = j - 1; break; }
+    }
+
+    // Collect reasons from assistant content and streaming/providers from tool invocations
+    const reasonsMap: Record<string, string> = {};
+    const streamingData: Record<number, any> = {};
+    const collectedMovies: Record<number, any> = {};
+
+    for (let k = start; k <= end; k++) {
+      const m: any = messages[k];
+      if (!m || m.role !== 'assistant') continue;
+
+      // Parse numbered-list reasons from the assistant textual content
+      if (m.content) {
+        const reasonPattern = /\d+\.\s+\*\*(.+?)\s*\((\d{4})\)\*\*\s*-\s*(.+?)(?:\n|$)/g;
+        let match;
+        while ((match = reasonPattern.exec(m.content)) !== null) {
+          const title = match[1].trim();
+          const year = match[2];
+          const reason = match[3].trim();
+          reasonsMap[`${title}|${year}`] = reason;
         }
       }
-    });
 
-    // Second pass: collect movies from search/recommend
-    message.toolInvocations.forEach((tool: any) => {
-      if (tool.state === 'result' && tool.result?.results) {
-        tool.result.results.forEach((movie: any) => {
-          const tmdbId = movie.tmdb_id;
-          const movieKey = `${movie.title}|${movie.year}`;
-          const reason = reasonsMap[movieKey] || null;
+      if (!m.toolInvocations) continue;
 
-          movies.push({
-            movie,
-            providers: streamingData[tmdbId] || null,
-            reason,
+      // Providers from get_streaming
+      m.toolInvocations.forEach((tool: any) => {
+        if (tool.toolName === 'get_streaming' && tool.state === 'result' && tool.result?.providers) {
+          const tmdbId = tool.args?.tmdb_id;
+          if (tmdbId) streamingData[tmdbId] = tool.result.providers;
+        }
+      });
+
+      // Movies from recommend/tmdb_search results
+      m.toolInvocations.forEach((tool: any) => {
+        if (tool.state === 'result' && tool.result?.results) {
+          tool.result.results.forEach((movie: any) => {
+            collectedMovies[movie.tmdb_id] = movie; // de-dupe by tmdb_id
           });
-        });
-      }
+        }
+      });
+    }
+
+    // Build final array with providers and reasons attached
+    const movies = Object.values(collectedMovies).map((movie: any) => {
+      const movieKey = `${movie.title}|${movie.year}`;
+      const reason = movie.reason || reasonsMap[movieKey] || null;
+      const providers = streamingData[movie.tmdb_id] ?? movie.providers ?? null;
+      return {
+        movie,
+        providers,
+        reason,
+      };
     });
 
-    return movies;
+    // Determine if current message is the last assistant in the turn
+    let lastAssistantIndex = -1;
+    for (let x = end; x >= start; x--) {
+      if (messages[x]?.role === 'assistant') { lastAssistantIndex = x; break; }
+    }
+    const isLastAssistantInTurn = currentIndex === lastAssistantIndex;
+
+    return { movies, isLastAssistantInTurn };
   };
 
   const handleAddToQueue = async (tmdbId: number) => {
@@ -154,15 +171,19 @@ export default function ChatPage() {
           </div>
         )}
 
-        {messages.map((message) => {
-          const movies = message.role === 'assistant' ? extractMoviesFromMessage(message) : [];
+        {messages.map((message, idx) => {
+          const { movies, isLastAssistantInTurn } = message.role === 'assistant'
+            ? aggregateTurnMovies(idx)
+            : { movies: [], isLastAssistantInTurn: false };
           const isMarkWatchedFlow = !!message.toolInvocations?.some(
             (t: any) => t.toolName === 'mark_watched'
           );
           const isRecommendFlow = !!message.toolInvocations?.some(
             (t: any) => t.toolName === 'recommend'
           );
-          const suppressAssistantBubble = message.role === 'assistant' && isRecommendFlow && movies.length > 0;
+          // Suppress assistant bubbles for any assistant messages in a turn where we have movie results,
+          // and only render the aggregated cards at the last assistant message of that turn.
+          const suppressAssistantBubble = message.role === 'assistant' && movies.length > 0;
 
           return (
             <div
@@ -226,13 +247,9 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* Render movie cards if movies were found */}
-                {movies.length > 0 && (
-                  <MovieResults
-                    movies={movies}
-                    onAddToQueue={handleAddToQueue}
-                    onMarkWatched={handleMarkWatched}
-                  />
+                {/* Render movie cards once per assistant turn when all data is available */}
+                {message.role === 'assistant' && movies.length > 0 && isLastAssistantInTurn && (
+                  <MovieResults movies={movies} />
                 )}
               </div>
             </div>
@@ -254,6 +271,8 @@ export default function ChatPage() {
 
       {/* Input */}
       <div className="bg-white border-t border-gray-200 px-6 py-4">
+        {/* Suggestion chips */}
+        <SuggestionChips />
         {error && (
           <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-800">{error}</p>
@@ -278,6 +297,51 @@ export default function ChatPage() {
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+function SuggestionChips() {
+  // Render nothing on the server and first client paint to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  const inputEl = () => document.querySelector('input[placeholder="Ask about movies..."]') as HTMLInputElement | null;
+
+  const addText = (text: string) => {
+    const el = inputEl();
+    if (!el) return;
+    const current = el.value || '';
+    const spacer = current && !current.endsWith(' ') ? ' ' : '';
+    if (!current.toLowerCase().includes(text.toLowerCase())) {
+      el.value = current + spacer + text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.focus();
+    }
+  };
+
+  const chip = (label: string, onClick: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center px-3 py-1.5 text-xs rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 mr-2 mb-2"
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="mb-3 -mt-1 flex flex-wrap">
+      {chip('1990s', () => addText('from the 1990s'))}
+      {chip('1980s', () => addText('from the 1980s'))}
+      {chip('2000s', () => addText('from the 2000s'))}
+      {chip('Adventure', () => addText('adventure'))}
+      {chip('Animation', () => addText('animation'))}
+      {chip('Comedy', () => addText('comedy'))}
+      {chip('Highly rated (7.5+)', () => addText('highly rated'))}
+      {chip('Streaming only', () => addText('streaming only'))}
+      {chip('Pixar', () => addText('Pixar'))}
     </div>
   );
 }

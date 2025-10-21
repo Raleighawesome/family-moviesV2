@@ -68,7 +68,8 @@ export function QueueClient({ queueItems }: QueueClientProps) {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/queue/mark-watched', {
+      // First, record the watch
+      const response = await fetch('/api/watch/mark', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,6 +80,13 @@ export function QueueClient({ queueItems }: QueueClientProps) {
       });
 
       if (!response.ok) throw new Error('Failed to mark as watched');
+
+      // Then remove from queue
+      await fetch('/api/queue/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: showRatingModal.itemId }),
+      });
 
       setShowRatingModal(null);
       router.refresh();

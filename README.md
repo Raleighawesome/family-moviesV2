@@ -66,6 +66,7 @@ See `.env.local.example` for the canonical list. Required for a working app:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key (safe for browser)
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key (server only)
 - `OPENAI_API_KEY`: OpenAI API key (embeddings)
+- `OPENAI_CHAT_MODEL` (optional): Chat model id (defaults to `gpt-4o`).
 - `TMDB_API_KEY`: TMDB API key
 - Optional: `APP_REGION`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`
 
@@ -127,4 +128,3 @@ Notes:
 
 ## License
 No license specified. All rights reserved.
-

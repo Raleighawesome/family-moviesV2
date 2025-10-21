@@ -14,6 +14,7 @@
     "seed": "tsx scripts/seed-family-movies.ts",
     "seed:popular": "tsx scripts/seed-popular-movies.ts",
     "populate-providers": "tsx scripts/populate-providers.ts",
+    "db:backfill:votes": "tsx scripts/backfill-movie-votes.ts",
     "db:backup": "./scripts/backup-local-db.sh",
     "db:migrate": "npx supabase migration up --local",
     "db:types": "npx supabase gen types typescript --local > lib/supabase/types.ts"

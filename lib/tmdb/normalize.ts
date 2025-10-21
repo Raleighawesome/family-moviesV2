@@ -15,6 +15,8 @@ export interface DatabaseMovie {
   genres: string[];
   keywords: string[];
   popularity: number | null;
+  vote_average?: number | null;
+  vote_count?: number | null;
   last_fetched_at?: string;
 }
 
@@ -68,6 +70,8 @@ export function normalizeTMDBMovie(
     genres: details.genres.map(g => g.name),
     keywords,
     popularity: details.popularity,
+    vote_average: typeof details.vote_average === 'number' ? details.vote_average : null,
+    vote_count: typeof details.vote_count === 'number' ? details.vote_count : null,
     last_fetched_at: new Date().toISOString(),
   };
 }

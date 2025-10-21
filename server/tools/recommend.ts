@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCompleteMovieData, searchMovies } from '@/lib/tmdb';
-import { normalizeTMDBMovie } from '@/lib/tmdb/normalize';
+import { normalizeTMDBMovie, normalizeTMDBProviders } from '@/lib/tmdb/normalize';
 import { generateMovieEmbedding, embeddingToVector } from '@/lib/openai/embeddings';
 import {
   recommendSchema,
@@ -131,10 +131,13 @@ export async function recommend(
   const supabase = await createClient();
 
   try {
+    const { year_min, year_max, genres: filterGenres, min_popularity, min_vote_average, streaming_only, limit } = validatedInput.data as any;
+    const filtersPresent = Boolean(year_min || year_max || (filterGenres && filterGenres.length) || min_popularity || min_vote_average);
+    const candidateLimit = filtersPresent ? Math.max(limit * 10, 60) : limit;
     // Get household preferences for logging
     const { data: prefs } = await supabase
       .from('family_prefs')
-      .select('allowed_ratings, max_runtime, blocked_keywords, preferred_streaming_services')
+      .select('allowed_ratings, max_runtime, blocked_keywords, preferred_streaming_services, rewatch_exclusion_days')
       .eq('household_id', householdId)
       .single();
 
@@ -158,7 +161,7 @@ export async function recommend(
     const { data: recommendations, error: recommendError } = await supabase
       .rpc('recommend_for_household', {
         p_household_id: householdId,
-        p_limit: limit,
+        p_limit: candidateLimit,
       });
 
     if (recommendError) {
@@ -190,7 +193,7 @@ export async function recommend(
         const { data: newRecommendations, error: newError } = await supabase
           .rpc('recommend_for_household', {
             p_household_id: householdId,
-            p_limit: limit,
+            p_limit: candidateLimit,
           });
 
         if (!newError && newRecommendations && newRecommendations.length > 0) {
@@ -206,26 +209,143 @@ export async function recommend(
     }
 
     // Fetch watch providers for each recommendation
-    const tmdbIds = recommendations.map((r: any) => r.tmdb_id);
+    let recs: any[] = recommendations || [];
+
+    // Apply optional filters (year range, genres) before provider fetch to reduce load
+    if (year_min || year_max) {
+      recs = recs.filter((r: any) => {
+        if (r.year == null) return false;
+        if (year_min && r.year < year_min) return false;
+        if (year_max && r.year > year_max) return false;
+        return true;
+      });
+    }
+    if (filterGenres && filterGenres.length > 0) {
+      const set = new Set(filterGenres.map((g) => g.toLowerCase()));
+      recs = recs.filter((r: any) => (r.genres || []).some((g: string) => set.has(g.toLowerCase())));
+    }
+
+    // Determine the final set we plan to present
+    const finalRecs = recs.slice(0, limit);
+    const finalIds = finalRecs.map((r: any) => r.tmdb_id);
+
+    // Fetch existing cached providers for fallback
     const { data: providers } = await supabase
       .from('movie_providers')
       .select('tmdb_id, providers')
       .eq('region', region)
-      .in('tmdb_id', tmdbIds);
+      .in('tmdb_id', finalIds);
 
-    // Create a map of tmdb_id -> providers
-    const providersMap = new Map(
-      providers?.map(p => [p.tmdb_id, p.providers]) || []
-    );
+    const providersMap = new Map(providers?.map(p => [p.tmdb_id, p.providers]) || []);
 
-    console.log(`[recommend] Got ${recommendations.length} recommendations from database`);
-    recommendations.forEach((rec: any) => {
+    // Refresh TMDB details and providers for final recommendations
+    const updatedProvidersMap = new Map<number, any>();
+    for (const rec of finalRecs) {
+      try {
+        const movieData = await getCompleteMovieData(rec.tmdb_id);
+
+        // Update movie details in DB (no embedding changes)
+        const normalizedMovie = normalizeTMDBMovie(
+          movieData.details,
+          movieData.mpaaRating,
+          movieData.keywords.keywords?.map((k: any) => k.name) || []
+        );
+        await supabase
+          .from('movies')
+          .update({
+            title: normalizedMovie.title,
+            year: normalizedMovie.year,
+            poster_path: normalizedMovie.poster_path,
+            overview: normalizedMovie.overview,
+            runtime: normalizedMovie.runtime,
+            mpaa: normalizedMovie.mpaa,
+            genres: normalizedMovie.genres,
+            keywords: normalizedMovie.keywords,
+            popularity: normalizedMovie.popularity,
+            vote_average: (normalizedMovie as any).vote_average ?? null,
+            vote_count: (normalizedMovie as any).vote_count ?? null,
+            last_fetched_at: new Date().toISOString(),
+          })
+          .eq('tmdb_id', rec.tmdb_id);
+
+        // Update providers cache for the household region
+        const normalizedProviders = normalizeTMDBProviders(rec.tmdb_id, region, movieData.watchProviders);
+        if (normalizedProviders) {
+          await supabase
+            .from('movie_providers')
+            .upsert(
+              {
+                tmdb_id: rec.tmdb_id,
+                region,
+                providers: normalizedProviders.providers as any,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'tmdb_id,region' }
+            );
+          updatedProvidersMap.set(rec.tmdb_id, normalizedProviders.providers);
+        }
+      } catch (e) {
+        // Best-effort refresh; fall back to existing providers if refresh fails
+        // console.warn('[recommend] refresh failed for', rec.tmdb_id, e);
+      }
+    }
+
+    console.log(`[recommend] Got ${finalRecs.length} recommendations from database (post-filter)`);
+    finalRecs.forEach((rec: any) => {
       console.log(`  - ${rec.title} (${rec.year}) - ${rec.mpaa}, ${rec.runtime}min`);
     });
 
     // Combine recommendations with providers
-    const results: RecommendResult[] = recommendations.map((rec: any) => {
-      const movieProviders = providersMap.get(rec.tmdb_id);
+    const maxRuntimePref = prefs?.max_runtime ?? null;
+    const allowedRatingsPref: string[] = prefs?.allowed_ratings ?? [];
+    // Optionally fetch popularity and vote metrics for filtering
+    let popularityMap = new Map<number, number>();
+    let voteAvgMap = new Map<number, number>();
+    if (min_popularity || min_vote_average) {
+      const { data: statRows } = await supabase
+        .from('movies')
+        .select('tmdb_id, popularity, vote_average, vote_count')
+        .in('tmdb_id', tmdbIds);
+      for (const r of statRows || []) {
+        popularityMap.set(r.tmdb_id, Number(r.popularity) || 0);
+        voteAvgMap.set(r.tmdb_id, Number(r.vote_average) || 0);
+      }
+      if (min_popularity) {
+        recs = recs.filter((r: any) => (popularityMap.get(r.tmdb_id) || 0) >= min_popularity);
+      }
+      if (min_vote_average) {
+        recs = recs.filter((r: any) => (voteAvgMap.get(r.tmdb_id) || 0) >= min_vote_average);
+      }
+    }
+
+    let results: RecommendResult[] = finalRecs.map((rec: any) => {
+      const movieProviders = updatedProvidersMap.get(rec.tmdb_id) ?? providersMap.get(rec.tmdb_id);
+
+      // Build a concise reason based on Family Settings
+      const reasons: string[] = [];
+      if (rec.mpaa && allowedRatingsPref.includes(rec.mpaa)) {
+        reasons.push(`Rated ${rec.mpaa} (within your allowed ratings)`);
+      }
+      if (rec.runtime && maxRuntimePref && rec.runtime <= maxRuntimePref) {
+        reasons.push(`Under your ${maxRuntimePref}m runtime limit`);
+      }
+      const preferredMatches = preferredServices.length > 0 && movieProviders?.flatrate
+        ? movieProviders.flatrate.filter((p: any) => preferredServices.includes(p.provider_name)).map((p: any) => p.provider_name)
+        : [];
+      if (preferredMatches && preferredMatches.length > 0) {
+        const list = preferredMatches.slice(0, 2).join(', ');
+        reasons.push(`Available on your preferred services (${list})`);
+      }
+      if (year_min || year_max) {
+        if (year_min === 1990 && year_max === 1999) reasons.push('From the 1990s');
+        else if (year_min && year_max) reasons.push(`From ${year_min}-${year_max}`);
+      }
+      if (filterGenres && filterGenres.length > 0) {
+        reasons.push(`Matches your genre preference (${filterGenres[0]})`);
+      }
+      if (min_vote_average) reasons.push('Highly rated pick');
+      else if (min_popularity) reasons.push('Popular pick');
+      const reason = reasons.length > 0 ? reasons[0] : undefined;
 
       return {
         tmdb_id: rec.tmdb_id,
@@ -236,6 +356,7 @@ export async function recommend(
         runtime: rec.runtime,
         genres: rec.genres || [],
         distance: rec.distance !== undefined ? rec.distance : undefined,
+        reason,
         providers: movieProviders
           ? {
               flatrate: movieProviders.flatrate?.map((p: any) => ({
@@ -254,6 +375,11 @@ export async function recommend(
           : undefined,
       };
     });
+
+    // If streaming_only is requested, filter to titles with flatrate availability
+    if (streaming_only) {
+      results = results.filter(r => (r.providers?.flatrate?.length || 0) > 0);
+    }
 
     // If the household has preferred streaming services, prioritize movies available on those services
     if (preferredServices.length > 0) {
@@ -283,7 +409,8 @@ export async function recommend(
       console.log(`[recommend] ${onPreferredCount}/${results.length} recommendations available on preferred services`);
     }
 
-    return results;
+    // Ensure we return at most the requested limit
+    return results.slice(0, limit);
   } catch (error) {
     if (error instanceof ToolError) {
       throw error;

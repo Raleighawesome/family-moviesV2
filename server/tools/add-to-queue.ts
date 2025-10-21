@@ -67,21 +67,27 @@ export async function addToQueue(
         movieData.keywords.keywords.map(k => k.name)
       );
 
-      // Generate embedding
+      // Generate embedding (best-effort)
       console.log(`Generating embedding for "${normalizedMovie.title}"...`);
-      const embedding = await generateMovieEmbedding({
-        title: normalizedMovie.title,
-        overview: normalizedMovie.overview,
-        genres: normalizedMovie.genres,
-        keywords: normalizedMovie.keywords.slice(0, 10), // Top 10 keywords
-      });
+      let embeddingVector: string | null = null;
+      try {
+        const embedding = await generateMovieEmbedding({
+          title: normalizedMovie.title,
+          overview: normalizedMovie.overview,
+          genres: normalizedMovie.genres,
+          keywords: normalizedMovie.keywords.slice(0, 10), // Top 10 keywords
+        });
+        embeddingVector = embeddingToVector(embedding);
+      } catch (err) {
+        console.warn('Embedding generation failed; proceeding without embedding:', err);
+      }
 
       // Insert movie into database
       const { data: insertedMovie, error: insertError } = await supabase
         .from('movies')
         .insert({
           ...normalizedMovie,
-          embedding: embeddingToVector(embedding),
+          embedding: embeddingVector,
         })
         .select('tmdb_id, title, year, poster_path')
         .single();
@@ -117,14 +123,16 @@ export async function addToQueue(
     }
 
     // Add to queue
-    const { error: queueError } = await supabase
+    const { data: queueInsert, error: queueError } = await supabase
       .from('list_items')
       .insert({
         household_id: householdId,
         tmdb_id: tmdb_id,
         list_type: 'queue',
         added_by: profileId || null,
-      });
+      })
+      .select('id')
+      .single();
 
     if (queueError) {
       throw new DatabaseError('Failed to add movie to queue', queueError);
@@ -139,6 +147,7 @@ export async function addToQueue(
         poster_path: movie.poster_path,
       },
       message: `Added "${movie.title}"${movie.year ? ` (${movie.year})` : ''} to your queue`,
+      queue_item_id: queueInsert?.id,
     };
   } catch (error) {
     if (error instanceof ToolError) {

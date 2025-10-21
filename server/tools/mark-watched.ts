@@ -190,6 +190,7 @@ export async function markWatched(
       },
       rating,
       message,
+      watch_id: Array.isArray(watchData) && watchData.length > 0 ? (watchData[0] as any).id : undefined,
     };
   } catch (error) {
     if (error instanceof ToolError) {

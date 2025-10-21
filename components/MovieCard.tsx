@@ -81,6 +81,42 @@ export function MovieCard({ movie, actions = [], providers, reason }: MovieCardP
     }
   };
 
+  const ratingAndRuntimeLine = () => {
+    const parts: string[] = [];
+    if (movie.rating) parts.push(`Rated ${movie.rating}`);
+    const rt = formatRuntime(movie.runtime);
+    if (rt) parts.push(rt.replace(' ', ' '));
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const availabilityLine = () => {
+    if (!providers) return null;
+    const anyProv = providers as any;
+    const sub = (arr?: any[]) => (arr || []).map(p => typeof p === 'string' ? p : p?.provider_name).filter(Boolean);
+
+    const flatrate = sub(anyProv.flatrate ?? anyProv.stream);
+    const rent = sub(anyProv.rent);
+    const buy = sub(anyProv.buy);
+
+    const list = (names: string[], limit = 4) => {
+      if (names.length === 0) return '';
+      const shown = names.slice(0, limit);
+      const more = names.length - shown.length;
+      return more > 0 ? `${shown.join(', ')}, +${more} more` : shown.join(', ');
+    };
+
+    if (flatrate.length > 0 && (rent.length > 0 || buy.length > 0)) {
+      const rentBuy = Array.from(new Set([...rent, ...buy]));
+      return `Available on ${list(flatrate)}${rentBuy.length ? `, or rent/buy on ${list(rentBuy)}` : ''}`;
+    }
+
+    if (flatrate.length > 0) return `Available on ${list(flatrate)}`;
+    if (rent.length > 0 && buy.length > 0) return `Available to rent/buy on ${list(Array.from(new Set([...rent, ...buy])))} `;
+    if (rent.length > 0) return `Available to rent on ${list(rent)}`;
+    if (buy.length > 0) return `Available to buy on ${list(buy)}`;
+    return null;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
       {/* Reason for recommendation (if provided) */}
@@ -140,6 +176,14 @@ export function MovieCard({ movie, actions = [], providers, reason }: MovieCardP
                   {genre}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Textual details derived from AI output */}
+          {(ratingAndRuntimeLine() || availabilityLine()) && (
+            <div className="mb-2 text-sm text-gray-700 space-y-1">
+              {ratingAndRuntimeLine() && <div> {ratingAndRuntimeLine()} </div>}
+              {availabilityLine() && <div> {availabilityLine()} </div>}
             </div>
           )}
 

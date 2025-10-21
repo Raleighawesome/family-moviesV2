@@ -45,6 +45,7 @@ export interface AddToQueueResult {
     poster_path: string | null;
   };
   message: string;
+  queue_item_id?: number;
 }
 
 // ============================================================================
@@ -53,6 +54,13 @@ export interface AddToQueueResult {
 
 export const recommendSchema = z.object({
   limit: z.number().int().min(1).max(24).default(10),
+  // Optional filters inferred from natural language
+  year_min: z.number().int().optional(),
+  year_max: z.number().int().optional(),
+  genres: z.array(z.string()).optional(),
+  min_popularity: z.number().optional(),
+  min_vote_average: z.number().min(0).max(10).optional(),
+  streaming_only: z.boolean().optional(),
 });
 
 export type RecommendInput = z.infer<typeof recommendSchema>;
@@ -66,6 +74,7 @@ export interface RecommendResult {
   runtime: number | null;
   genres: string[];
   distance?: number; // Similarity score (lower is more similar)
+  reason?: string; // One-line rationale referencing Family Settings
   providers?: {
     flatrate?: Array<{ provider_name: string; logo_path: string | null }>;
     rent?: Array<{ provider_name: string; logo_path: string | null }>;
@@ -94,6 +103,7 @@ export interface MarkWatchedResult {
   };
   rating?: number;
   message: string;
+  watch_id?: number;
 }
 
 // ============================================================================

@@ -41,9 +41,21 @@ Guidelines:
 - The recommendation tool automatically prioritizes movies available on the household's preferred streaming services (configured in Family Settings)
 - The recommendation tool automatically excludes movies watched within the household's re-watch exclusion period (e.g., don't recommend movies watched in the last year)
 
+Intent parsing for recommendations:
+- If the user specifies a COUNT (e.g., "recommend 2"), set limit to that count.
+- If the user specifies a DECADE (e.g., "from the 90s"), set year_min and year_max accordingly (1990..1999 for 90s; 1980..1989 for 80s; 2000..2009 for 2000s; 2010..2019 for 2010s).
+- If the user specifies GENRES (e.g., "adventure", "comedy"), set genres to those values (capitalized, singular where applicable, e.g., Adventure, Comedy).
+- If the user asks for "highly rated" or "critically acclaimed", set min_vote_average to 7.5 in addition to respecting Family Settings.
+
+CLARIFYING QUESTIONS:
+- If the user asks for recommendations without any constraints (no decade or genre), ask ONE concise clarifying question (e.g., "Any decade or genre preferences?") then proceed on next turn.
+- If the user mentions "Pixar", infer genres include Animation and Family.
+- If the user asks for "streaming only", set streaming_only = true and prefer titles with flatrate availability.
+- If results after filtering are fewer than requested, ask ONE follow-up to widen (e.g., "Widen beyond the 90s or include PG-13?") instead of declaring none.
+
 RECOMMENDATION PRESENTATION FORMAT:
 When providing movie recommendations, for EACH movie you must:
-1. Provide a SHORT one-line reason WHY you chose it (e.g., "Similar adventure themes to movies you loved" or "Highly rated family comedy on Disney+")
+1. Provide a SHORT one-line reason WHY you chose it that explicitly references relevant Family Settings when applicable (e.g., "Rated PG and under your 120m limit", "On your preferred Disney+", "Under your runtime limit and PG-13 is allowed"). The reason should also reflect any user-stated constraints like decade (e.g., 1990s), genre (e.g., Adventure), or "highly rated/popular".
 2. Present it in this EXACT numbered list format:
 
 Example:
@@ -139,9 +151,18 @@ export async function POST(req: Request) {
     console.log('[Chat API] Profile ID:', profileId);
 
     console.log('[Chat API] Starting streamText...');
+    // Gate streaming for models that might require org verification (e.g., gpt-5)
+    const chatModel = process.env.OPENAI_CHAT_MODEL || 'gpt-4o';
+    const allowUnverified = process.env.OPENAI_ALLOW_UNVERIFIED_STREAM === 'true';
+    const isPossiblyBlocked = /^gpt-5/i.test(chatModel);
+    const fallbackModel = process.env.OPENAI_CHAT_MODEL_FALLBACK || 'gpt-4o';
+    const modelToUse = isPossiblyBlocked && !allowUnverified ? fallbackModel : chatModel;
+    if (modelToUse !== chatModel) {
+      console.warn('[Chat API] Streaming gated for model', chatModel, '→ falling back to', modelToUse);
+    }
     // Stream text with tool calling
     const result = await streamText({
-      model: openai('gpt-4o'),
+      model: openai(modelToUse as any),
       system: SYSTEM_PROMPT,
       messages,
       tools: {
@@ -185,7 +206,7 @@ export async function POST(req: Request) {
 
         recommend: tool({
           description:
-            'Get personalized movie recommendations based on household viewing history and ratings. Uses vector similarity if ratings exist, otherwise returns popular movies filtered by preferences. IMPORTANT: If the database doesn\'t have enough movies matching the household\'s preferences, this tool will AUTOMATICALLY fetch and store more family-friendly movies from TMDB - this may take 10-20 seconds. Inform the user when this happens.',
+            'Get personalized movie recommendations. Accepts optional filters: limit (count), year_min/year_max (e.g., 1990..1999 for "from the 90s"), genres (e.g., ["Adventure"]), min_vote_average (e.g., 7.5 for "highly rated"), streaming_only (flatrate), and min_popularity (popularity proxy). Uses vector similarity when available, otherwise popularity. Automatically fetches more family-friendly movies if the local database is sparse.',
           parameters: recommendSchema,
           execute: async (input) => {
             try {
@@ -261,15 +282,13 @@ export async function POST(req: Request) {
     console.log('[Chat API] streamText completed, result:', Object.keys(result));
     return result.toAIStreamResponse();
   } catch (error) {
-    console.error('Chat API error:', error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    const isVerification = /verify|stream|organization/i.test(message);
+    const status = isVerification ? 400 : 500;
+    console.error('Chat API error:', message);
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
