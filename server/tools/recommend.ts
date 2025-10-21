@@ -239,6 +239,7 @@ export async function recommend(
     const providersMap = new Map(providers?.map(p => [p.tmdb_id, p.providers]) || []);
 
     // Refresh TMDB details and providers for final recommendations
+    const overviewMap = new Map<number, string | null>();
     const updatedProvidersMap = new Map<number, any>();
     for (const rec of finalRecs) {
       try {
@@ -250,6 +251,7 @@ export async function recommend(
           movieData.mpaaRating,
           movieData.keywords.keywords?.map((k: any) => k.name) || []
         );
+        overviewMap.set(rec.tmdb_id, normalizedMovie.overview || null);
         await supabase
           .from('movies')
           .update({
@@ -355,24 +357,12 @@ export async function recommend(
         mpaa: rec.mpaa,
         runtime: rec.runtime,
         genres: rec.genres || [],
+        overview: overviewMap.get(rec.tmdb_id) ?? null,
+        vote_average: voteAvgMap.get(rec.tmdb_id) || null,
         distance: rec.distance !== undefined ? rec.distance : undefined,
         reason,
-        providers: movieProviders
-          ? {
-              flatrate: movieProviders.flatrate?.map((p: any) => ({
-                provider_name: p.provider_name,
-                logo_path: p.logo_path,
-              })),
-              rent: movieProviders.rent?.map((p: any) => ({
-                provider_name: p.provider_name,
-                logo_path: p.logo_path,
-              })),
-              buy: movieProviders.buy?.map((p: any) => ({
-                provider_name: p.provider_name,
-                logo_path: p.logo_path,
-              })),
-            }
-          : undefined,
+        // Pass through full provider objects (with ids and logos) for icons in UI
+        providers: movieProviders || undefined,
       };
     });
 
@@ -381,33 +371,31 @@ export async function recommend(
       results = results.filter(r => (r.providers?.flatrate?.length || 0) > 0);
     }
 
-    // If the household has preferred streaming services, prioritize movies available on those services
-    if (preferredServices.length > 0) {
-      console.log(`[recommend] Prioritizing ${preferredServices.length} preferred services:`, preferredServices);
+    // Prioritize by availability: preferred streaming (flatrate on preferred services) > any streaming (flatrate) > rent > buy
+    const prefSet = new Set((preferredServices || []).map((s: string) => s.toLowerCase()));
+    const availScore = (r: RecommendResult) => {
+      const flat = r.providers?.flatrate || [];
+      const rent = r.providers?.rent || [];
+      const buy = r.providers?.buy || [];
+      const hasPreferredFlat = flat.some(p => prefSet.has(p.provider_name.toLowerCase()));
+      if (hasPreferredFlat) return 3;
+      if (flat.length > 0) return 2;
+      if (rent.length > 0) return 1;
+      if (buy.length > 0) return 0;
+      return -1;
+    };
 
-      // Sort results: movies on preferred services first, then by distance/popularity
-      results.sort((a, b) => {
-        const aHasPreferred = a.providers?.flatrate?.some(p =>
-          preferredServices.includes(p.provider_name)
-        ) || false;
-        const bHasPreferred = b.providers?.flatrate?.some(p =>
-          preferredServices.includes(p.provider_name)
-        ) || false;
+    results.sort((a, b) => {
+      const sa = availScore(a);
+      const sb = availScore(b);
+      if (sa !== sb) return sb - sa; // higher score first
+      return 0; // keep prior ordering for ties
+    });
 
-        // If one has preferred service and other doesn't, prioritize the one that does
-        if (aHasPreferred && !bHasPreferred) return -1;
-        if (!aHasPreferred && bHasPreferred) return 1;
-
-        // If both or neither have preferred service, maintain original order (by distance/popularity)
-        return 0;
-      });
-
-      const onPreferredCount = results.filter(r =>
-        r.providers?.flatrate?.some(p => preferredServices.includes(p.provider_name))
-      ).length;
-
-      console.log(`[recommend] ${onPreferredCount}/${results.length} recommendations available on preferred services`);
-    }
+    const onPreferredCount = results.filter(r =>
+      r.providers?.flatrate?.some(p => prefSet.has(p.provider_name.toLowerCase()))
+    ).length;
+    console.log(`[recommend] ${onPreferredCount}/${results.length} recommendations available on preferred services`);
 
     // Ensure we return at most the requested limit
     return results.slice(0, limit);

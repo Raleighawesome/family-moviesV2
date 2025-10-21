@@ -16,6 +16,7 @@ interface Movie {
   rating: string | null;
   runtime: number | null;
   genres: string[];
+  overview?: string | null;
 }
 
 interface MovieCardAction {
@@ -146,6 +147,11 @@ export function MovieCard({ movie, actions = [], providers, reason }: MovieCardP
           </h3>
           <p className="text-sm text-gray-600 mb-2">{movie.year}</p>
 
+          {/* Overview */}
+          {movie.overview && (
+            <p className="text-sm text-gray-700 mb-2 line-clamp-3">{movie.overview}</p>
+          )}
+
           {/* Metadata - Rating & Runtime */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             {/* MPAA Rating Badge */}
@@ -179,11 +185,14 @@ export function MovieCard({ movie, actions = [], providers, reason }: MovieCardP
             </div>
           )}
 
-          {/* Textual details derived from AI output */}
-          {(ratingAndRuntimeLine() || availabilityLine()) && (
-            <div className="mb-2 text-sm text-gray-700 space-y-1">
-              {ratingAndRuntimeLine() && <div> {ratingAndRuntimeLine()} </div>}
-              {availabilityLine() && <div> {availabilityLine()} </div>}
+          {/* Why it's a match (≤ 3 sentences) */}
+          {(reason || availabilityLine()) && (
+            <div className="mb-2 text-sm text-gray-800">
+              <span className="font-semibold">Why it’s a match: </span>
+              <span>
+                {reason}
+                {availabilityLine() ? ` ${availabilityLine()}.` : ''}
+              </span>
             </div>
           )}
 

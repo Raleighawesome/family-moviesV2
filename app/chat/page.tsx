@@ -79,7 +79,10 @@ export default function ChatPage() {
     const movies = Object.values(collectedMovies).map((movie: any) => {
       const movieKey = `${movie.title}|${movie.year}`;
       const reason = movie.reason || reasonsMap[movieKey] || null;
-      const providers = streamingData[movie.tmdb_id] ?? movie.providers ?? null;
+      // Prefer providers from the recommendation tool (objects with ids/logos)
+      const pv = (movie as any).providers;
+      const sd = streamingData[movie.tmdb_id];
+      const providers = pv || sd || null;
       return {
         movie,
         providers,

@@ -73,12 +73,14 @@ export interface RecommendResult {
   mpaa: string | null;
   runtime: number | null;
   genres: string[];
+  overview?: string | null;
+  vote_average?: number | null;
   distance?: number; // Similarity score (lower is more similar)
   reason?: string; // One-line rationale referencing Family Settings
   providers?: {
-    flatrate?: Array<{ provider_name: string; logo_path: string | null }>;
-    rent?: Array<{ provider_name: string; logo_path: string | null }>;
-    buy?: Array<{ provider_name: string; logo_path: string | null }>;
+    flatrate?: Array<{ provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number }>;
+    rent?: Array<{ provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number }>;
+    buy?: Array<{ provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number }>;
   };
 }
 

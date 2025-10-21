@@ -12,6 +12,7 @@ interface Movie {
   rating: string | null;
   runtime: number | null;
   genres: string[];
+  overview?: string | null;
 }
 
 interface Provider {
@@ -149,6 +150,7 @@ export function MovieResults({ movies }: MovieResultsProps) {
           id: (movie as any).id || movie.tmdb_id,
           // Ensure rating badge shows by mapping mpaa -> rating when needed
           rating: (movie as any).rating ?? (movie as any).mpaa ?? null,
+          overview: (movie as any).overview ?? null,
         } as any;
         const loading = loadingStates[movie.tmdb_id];
 
