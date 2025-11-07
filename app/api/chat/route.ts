@@ -101,8 +101,16 @@ Always prioritize family-friendly content and respect the household's preference
 export async function POST(req: Request) {
   try {
     console.log('[Chat API] Received request');
-    const { messages } = await req.json();
-    console.log('[Chat API] Messages:', messages);
+    const { messages, sessionId } = await req.json();
+    console.log('[Chat API] Messages:', messages, 'Session:', sessionId);
+
+    if (!sessionId) {
+      console.error('[Chat API] Missing sessionId');
+      return new Response(JSON.stringify({ error: 'Missing chat session' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get authenticated user and household context
     const supabase = await createClient();
@@ -145,6 +153,64 @@ export async function POST(req: Request) {
 
     const profileId = profile?.id;
     console.log('[Chat API] Profile ID:', profileId);
+
+    const { data: sessionRecord, error: sessionError } = await supabase
+      .from('chat_sessions')
+      .select('id, household_id, title')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionError) {
+      console.error('[Chat API] Failed to fetch session:', sessionError);
+      return new Response(JSON.stringify({ error: 'Failed to load chat session' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!sessionRecord || sessionRecord.household_id !== householdId) {
+      console.error('[Chat API] Session not found or not part of household');
+      return new Response(JSON.stringify({ error: 'Invalid chat session' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const logUserMessage = async () => {
+      const lastMessage = Array.isArray(messages) ? messages[messages.length - 1] : null;
+      if (!lastMessage || lastMessage.role !== 'user') return;
+
+      const content = typeof lastMessage.content === 'string' ? lastMessage.content : '';
+
+      const { error: insertError } = await supabase.from('chat_messages').insert({
+        session_id: sessionRecord.id,
+        role: 'user',
+        content,
+      });
+
+      if (insertError) {
+        console.error('[Chat API] Failed to record user message:', insertError);
+      }
+
+      const updateData: Record<string, any> = { last_activity_at: new Date().toISOString() };
+      if (!sessionRecord.title) {
+        const cleaned = content.replace(/\s+/g, ' ').trim();
+        if (cleaned) {
+          updateData.title = cleaned.length > 120 ? `${cleaned.slice(0, 117)}...` : cleaned;
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from('chat_sessions')
+        .update(updateData)
+        .eq('id', sessionRecord.id);
+
+      if (updateError) {
+        console.error('[Chat API] Failed to update session metadata:', updateError);
+      }
+    };
+
+    await logUserMessage();
 
     console.log('[Chat API] Starting streamText...');
     // Gate streaming for models that might require org verification (e.g., gpt-5)
@@ -273,6 +339,75 @@ export async function POST(req: Request) {
         }),
       },
       maxSteps: 5,
+      onFinish: async (event) => {
+        try {
+          const nowIso = new Date().toISOString();
+          const toolInvocationMap = new Map<string, any>();
+
+          const mergeCall = (call: any) => {
+            if (!call?.toolCallId) return;
+            const existing = toolInvocationMap.get(call.toolCallId) ?? {
+              toolCallId: call.toolCallId,
+              toolName: call.toolName,
+              args: call.args ?? null,
+              state: 'call',
+            };
+            if (!existing.args && call.args) {
+              existing.args = call.args;
+            }
+            toolInvocationMap.set(call.toolCallId, existing);
+          };
+
+          const mergeResult = (result: any) => {
+            if (!result?.toolCallId) return;
+            const existing = toolInvocationMap.get(result.toolCallId) ?? {
+              toolCallId: result.toolCallId,
+              toolName: result.toolName,
+              args: result.args ?? null,
+              state: 'call',
+            };
+            existing.state = 'result';
+            existing.result = result.result;
+            if (!existing.args && result.args) {
+              existing.args = result.args;
+            }
+            toolInvocationMap.set(result.toolCallId, existing);
+          };
+
+          const steps = event.steps ?? [];
+          for (const step of steps) {
+            (step.toolCalls ?? []).forEach(mergeCall);
+            (step.toolResults ?? []).forEach(mergeResult);
+          }
+
+          (event.toolCalls ?? []).forEach(mergeCall);
+          (event.toolResults ?? []).forEach(mergeResult);
+
+          const toolInvocations = Array.from(toolInvocationMap.values());
+
+          const { error: insertError } = await supabase.from('chat_messages').insert({
+            session_id: sessionRecord.id,
+            role: 'assistant',
+            content: event.text ?? '',
+            metadata: toolInvocations.length > 0 ? { toolInvocations } : null,
+          });
+
+          if (insertError) {
+            console.error('[Chat API] Failed to record assistant message:', insertError);
+          }
+
+          const { error: updateError } = await supabase
+            .from('chat_sessions')
+            .update({ last_activity_at: nowIso })
+            .eq('id', sessionRecord.id);
+
+          if (updateError) {
+            console.error('[Chat API] Failed to update session timestamp:', updateError);
+          }
+        } catch (finishError) {
+          console.error('[Chat API] Error persisting assistant message:', finishError);
+        }
+      },
     });
 
     console.log('[Chat API] streamText completed, result:', Object.keys(result));
