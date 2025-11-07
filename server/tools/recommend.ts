@@ -131,8 +131,26 @@ export async function recommend(
   const supabase = await createClient();
 
   try {
-    const { year_min, year_max, genres: filterGenres, min_popularity, min_vote_average, streaming_only, limit } = validatedInput.data as any;
-    const filtersPresent = Boolean(year_min || year_max || (filterGenres && filterGenres.length) || min_popularity || min_vote_average);
+    const {
+      year_min,
+      year_max,
+      genres: filterGenres,
+      min_popularity,
+      min_vote_average,
+      streaming_only,
+      query_description,
+    } = validatedInput.data;
+    if (query_description) {
+      console.log('[recommend] Query description provided:', query_description);
+    }
+    const filtersPresent = Boolean(
+      year_min ||
+      year_max ||
+      (filterGenres && filterGenres.length) ||
+      min_popularity ||
+      min_vote_average ||
+      query_description
+    );
     const candidateLimit = filtersPresent ? Math.max(limit * 10, 60) : limit;
     // Get household preferences for logging
     const { data: prefs } = await supabase
@@ -303,6 +321,7 @@ export async function recommend(
     // Optionally fetch popularity and vote metrics for filtering
     let popularityMap = new Map<number, number>();
     let voteAvgMap = new Map<number, number>();
+    const tmdbIds = recs.map((r: any) => r.tmdb_id);
     if (min_popularity || min_vote_average) {
       const { data: statRows } = await supabase
         .from('movies')

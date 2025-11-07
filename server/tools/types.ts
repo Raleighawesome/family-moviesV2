@@ -61,6 +61,12 @@ export const recommendSchema = z.object({
   min_popularity: z.number().optional(),
   min_vote_average: z.number().min(0).max(10).optional(),
   streaming_only: z.boolean().optional(),
+  query_description: z
+    .string()
+    .min(1)
+    .max(2000)
+    .optional()
+    .describe('Free-form natural language describing the desired recommendations'),
 });
 
 export type RecommendInput = z.infer<typeof recommendSchema>;
