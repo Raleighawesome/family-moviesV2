@@ -109,6 +109,20 @@ export async function markWatched(
       console.log(`✅ Added movie "${movie.title}" to database`);
     }
 
+    // Determine if this should be marked as a rewatch (any prior watch exists)
+    const { data: priorWatchData, error: priorWatchError } = await supabase
+      .from('watches')
+      .select('id')
+      .eq('household_id', householdId)
+      .eq('tmdb_id', tmdb_id)
+      .limit(1);
+
+    if (priorWatchError) {
+      throw new DatabaseError('Failed to check prior watch history', priorWatchError);
+    }
+
+    const isRewatch = Array.isArray(priorWatchData) && priorWatchData.length > 0;
+
     // Insert watch record
     console.log(`[mark-watched] Inserting watch record:`, {
       household_id: householdId,
@@ -117,6 +131,8 @@ export async function markWatched(
       movie_title: movie.title,
     });
 
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : undefined;
+
     const { data: watchData, error: watchError } = await supabase
       .from('watches')
       .insert({
@@ -124,8 +140,8 @@ export async function markWatched(
         profile_id: profileId || null,
         tmdb_id: tmdb_id,
         watched_at: watched_at || new Date().toISOString(),
-        rewatch: false,
-        notes: notes || null,
+        rewatch: isRewatch,
+        notes: trimmedNotes && trimmedNotes.length > 0 ? trimmedNotes : null,
       })
       .select();
 
@@ -177,10 +193,17 @@ export async function markWatched(
     });
 
     let message = `I've marked "${movie.title}"${movie.year ? ` (${movie.year})` : ''} as watched on ${watchedDateStr}`;
+    if (isRewatch) {
+      message += ' as a rewatch';
+    }
     if (rating !== undefined) {
       message += `, with a rating of ${rating} star${rating !== 1 ? 's' : ''}`;
     }
     message += '.';
+
+    if (trimmedNotes && trimmedNotes.length > 0) {
+      message += ` Added note: "${trimmedNotes}".`;
+    }
 
     return {
       success: true,
