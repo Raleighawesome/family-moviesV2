@@ -299,8 +299,11 @@ export default function ChatPage() {
     if (!input.trim()) return;
     setError(null);
     try {
-      await ensureSession();
-      await handleSubmit(e);
+      const ensuredSessionId = await ensureSession();
+      if (!ensuredSessionId) {
+        throw new Error('Failed to create chat session');
+      }
+      await handleSubmit(e, { body: { sessionId: ensuredSessionId } });
     } catch (err) {
       console.error('[Chat] Failed to send message', err);
       setError(err instanceof Error ? err.message : 'Failed to send message');
