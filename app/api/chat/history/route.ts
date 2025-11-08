@@ -111,5 +111,20 @@ export async function GET() {
     message_count: session.chat_messages?.[0]?.count ?? 0,
   }));
 
-  return NextResponse.json({ sessions: formatted });
+  const emptySessionIds = formatted.filter((session) => session.message_count === 0).map((session) => session.id);
+
+  if (emptySessionIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('chat_sessions')
+      .delete()
+      .in('id', emptySessionIds);
+
+    if (deleteError) {
+      console.error('[Chat History] Failed to delete empty sessions', deleteError);
+    }
+  }
+
+  const nonEmptySessions = formatted.filter((session) => session.message_count > 0);
+
+  return NextResponse.json({ sessions: nonEmptySessions });
 }
