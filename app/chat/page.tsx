@@ -158,6 +158,9 @@ export default function ChatPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedHistorySession, setSelectedHistorySession] = useState<string | null>(null);
   const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSessionSummary | null>(null);
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
+  const [deleteHistoryError, setDeleteHistoryError] = useState<string | null>(null);
   const historyCache = useRef(new Map<string, ChatMessage[]>());
 
   const fetchSessions = useCallback(async () => {
@@ -240,13 +243,6 @@ export default function ChatPage() {
   }, [sessionId, createNewSession]);
 
   useEffect(() => {
-    createNewSession().catch((err) => {
-      console.error('[Chat] Failed to initialize session', err);
-      setError(err instanceof Error ? err.message : 'Failed to start chat session');
-    });
-  }, [createNewSession]);
-
-  useEffect(() => {
     if (isHistoryOpen) {
       fetchSessions();
     }
@@ -254,8 +250,18 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isHistoryOpen) return;
-    if (historySessions.length === 0) return;
-    if (!selectedHistorySession) {
+    if (historySessions.length === 0) {
+      if (selectedHistorySession) {
+        setSelectedHistorySession(null);
+      }
+      setHistoryMessages([]);
+      return;
+    }
+
+    const hasSelectedSession =
+      !!selectedHistorySession && historySessions.some((session) => session.id === selectedHistorySession);
+
+    if (!hasSelectedSession) {
       const firstId = historySessions[0].id;
       setSelectedHistorySession(firstId);
       fetchHistoryMessages(firstId);
@@ -301,18 +307,14 @@ export default function ChatPage() {
     }
   };
 
-  const startNewChat = useCallback(async () => {
+  const startNewChat = useCallback(() => {
     setError(null);
     setMessages([]);
     setInput('');
     historyCache.current.clear();
-    try {
-      await createNewSession();
-    } catch (err) {
-      console.error('[Chat] Failed to start new conversation', err);
-      setError(err instanceof Error ? err.message : 'Failed to start a new chat');
-    }
-  }, [createNewSession, setMessages, setInput]);
+    pendingSession.current = null;
+    setSessionId(null);
+  }, [setMessages, setInput]);
 
   const renderMessageList = (messageList: ChatMessage[], options?: { keyPrefix?: string; showTimestamp?: boolean }) => {
     return messageList.map((message, idx) => {
@@ -411,10 +413,52 @@ export default function ChatPage() {
     [fetchHistoryMessages]
   );
 
+  const confirmDeleteSession = useCallback(async () => {
+    const target = deleteTarget;
+    if (!target) return;
+
+    setIsDeletingHistory(true);
+    setDeleteHistoryError(null);
+
+    try {
+      const res = await fetch(`/api/chat/history/${target.id}`, { method: 'DELETE' });
+      const payload = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Failed to delete chat session');
+      }
+
+      historyCache.current.delete(target.id);
+
+      if (selectedHistorySession === target.id) {
+        setSelectedHistorySession(null);
+        setHistoryMessages([]);
+      }
+
+      setHistorySessions((prev) => prev.filter((session) => session.id !== target.id));
+
+      if (sessionId === target.id) {
+        setSessionId(null);
+        setMessages([]);
+        setInput('');
+        pendingSession.current = null;
+      }
+
+      setDeleteTarget(null);
+      await fetchSessions();
+    } catch (err) {
+      console.error('[Chat] Failed to delete chat history session', err);
+      setDeleteHistoryError(err instanceof Error ? err.message : 'Failed to delete chat session');
+    } finally {
+      setIsDeletingHistory(false);
+    }
+  }, [deleteTarget, fetchSessions, selectedHistorySession, sessionId, setMessages, setInput]);
+
   const sendDisabled = isLoading || isCreatingSession || !input.trim();
 
   return (
-    <div className="flex bg-gray-50" style={{ height: 'calc(100vh - 64px)' }}>
+    <>
+      <div className="flex bg-gray-50" style={{ height: 'calc(100vh - 64px)' }}>
       <div className="flex flex-col flex-1">
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -539,26 +583,54 @@ export default function ChatPage() {
                   {historySessions.map((session) => {
                     const isActive = selectedHistorySession === session.id;
                     return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        onClick={() => openHistoryForSession(session.id)}
-                        className={`w-full text-left px-3 py-2 rounded-lg border ${
-                          isActive
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="text-sm font-medium truncate">
-                          {formatSessionTitle(session)}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1 flex justify-between">
-                          <span>{formatTimestamp(session.last_activity_at)}</span>
-                          <span>
-                            {session.message_count} {session.message_count === 1 ? 'message' : 'messages'}
-                          </span>
-                        </div>
-                      </button>
+                      <div key={session.id} className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => openHistoryForSession(session.id)}
+                          className={`w-full text-left px-3 py-2 pr-12 rounded-lg border transition ${
+                            isActive
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="text-sm font-medium truncate">
+                            {formatSessionTitle(session)}
+                          </div>
+                          <div className="mt-1 flex justify-between text-xs text-gray-500">
+                            <span>{formatTimestamp(session.last_activity_at)}</span>
+                            <span>
+                              {session.message_count} {session.message_count === 1 ? 'message' : 'messages'}
+                            </span>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Delete conversation"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteHistoryError(null);
+                            setDeleteTarget(session);
+                          }}
+                          className={`absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 ${
+                            isActive
+                              ? 'opacity-100'
+                              : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto'
+                          }`}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M8.5 3a1.5 1.5 0 0 1 3 0H15a.75.75 0 0 1 0 1.5h-.388l-.73 10.22A2.25 2.25 0 0 1 11.64 17H8.36a2.25 2.25 0 0 1-2.242-2.28L5.388 4.5H5A.75.75 0 0 1 5 3h3.5Zm-1.853 1.5.706 9.876a.75.75 0 0 0 .75.624h3.28a.75.75 0 0 0 .75-.624L12.353 4.5H6.647Zm1.647 2.25a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5a.75.75 0 0 1 .75-.75Zm3 0a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5a.75.75 0 0 1 .75-.75Z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -587,7 +659,56 @@ export default function ChatPage() {
           </aside>
         </>
       )}
-    </div>
+        </div>
+        {deleteTarget && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+            onClick={() => {
+              if (isDeletingHistory) return;
+              setDeleteTarget(null);
+              setDeleteHistoryError(null);
+            }}
+          >
+            <div
+              className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-gray-900">Delete conversation?</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                This will permanently remove{' '}
+                {deleteTarget.title ? `“${deleteTarget.title}”` : 'this conversation'} from your chat history.
+              </p>
+              {deleteHistoryError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {deleteHistoryError}
+                </div>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isDeletingHistory) return;
+                    setDeleteTarget(null);
+                    setDeleteHistoryError(null);
+                  }}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isDeletingHistory}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteSession}
+                  disabled={isDeletingHistory}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeletingHistory ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+    </>
   );
 }
 

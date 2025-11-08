@@ -92,3 +92,67 @@ export async function GET(
     messages: formatted,
   });
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { sessionId: string } }
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { sessionId } = params;
+
+  const { data: householdMember, error: memberError } = await supabase
+    .from('household_members')
+    .select('household_id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (memberError || !householdMember) {
+    return NextResponse.json({ error: 'No household found for user' }, { status: 404 });
+  }
+
+  const { data: session, error: sessionError } = await supabase
+    .from('chat_sessions')
+    .select('id, household_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+
+  if (sessionError) {
+    console.error('[Chat History] Failed to load session for deletion', sessionError);
+    return NextResponse.json({ error: 'Failed to delete chat session' }, { status: 500 });
+  }
+
+  if (!session || session.household_id !== householdMember.household_id) {
+    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+  }
+
+  const { error: deleteMessagesError } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('session_id', sessionId);
+
+  if (deleteMessagesError) {
+    console.error('[Chat History] Failed to delete chat messages', deleteMessagesError);
+    return NextResponse.json({ error: 'Failed to delete chat session' }, { status: 500 });
+  }
+
+  const { error: deleteSessionError } = await supabase
+    .from('chat_sessions')
+    .delete()
+    .eq('id', sessionId);
+
+  if (deleteSessionError) {
+    console.error('[Chat History] Failed to delete session', deleteSessionError);
+    return NextResponse.json({ error: 'Failed to delete chat session' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
