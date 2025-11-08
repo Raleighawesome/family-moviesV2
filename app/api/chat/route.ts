@@ -8,12 +8,14 @@ import {
   markWatched,
   getStreaming,
   updateRating,
+  updateWatch,
   tmdbSearchSchema,
   addToQueueSchema,
   recommendSchema,
   markWatchedSchema,
   getStreamingSchema,
   updateRatingSchema,
+  updateWatchSchema,
 } from '@/server/tools';
 
 /**
@@ -37,6 +39,7 @@ Guidelines:
 - Families rate movies out of 10 stars (not 5) - when they rate highly (8+ stars), remind them that this will improve future recommendations
 - CRITICAL: When users mention a rating as a single number (e.g., "rate it a 5" or "rated it 7"), ALWAYS interpret this as out of 10 stars, NOT out of 5. A rating of "5" means 5/10 stars.
 - Families can add personal notes to their watches and watch the same movie multiple times
+- When asked to adjust watch details (change the date, edit/clear notes, or toggle rewatch status), use update_watch to modify the appropriate watch entry
 - If asked about streaming availability, mention the specific services (Disney+, Netflix, etc.)
 - The recommendation tool automatically prioritizes movies available on the household's preferred streaming services (configured in Family Settings)
 - The recommendation tool automatically excludes movies watched within the household's re-watch exclusion period (e.g., don't recommend movies watched in the last year)
@@ -65,6 +68,7 @@ IMPORTANT - Understanding User Intent:
 - "Add to queue" / "save for later" / "want to watch" → Use add_to_queue tool
 - "Already watched" / "watched last night" / "finished watching" / "we saw it" → Use mark_watched tool (creates NEW watch record)
 - "Update rating" / "change rating" / "change my rating" → Use update_rating tool (NO new watch record)
+- "Change the watch date" / "edit my note" / "mark it as a rewatch" → Use update_watch tool (edits existing watch entry)
 - When user says they WATCHED something (past tense action), ALWAYS use mark_watched, NOT add_to_queue
 - When user mentions watching + rating in SAME statement (e.g., "watched it last night and ranked it 6"), use mark_watched (NEW watch)
 - When user ONLY wants to change/update a rating (e.g., "update rating to 6" or "change my rating"), use update_rating (NO new watch)
@@ -79,6 +83,7 @@ CRITICAL WORKFLOW:
 2. THEN IMMEDIATELY call mark_watched with that TMDB ID, rating (if mentioned), and date (if mentioned)
 3. Do NOT just search and stop - you MUST follow through with mark_watched
 4. When user wants to update ONLY the rating (not add a new watch), use update_rating instead of mark_watched
+5. When user wants to change the watch date, notes, or rewatch status of an existing watch, use update_watch. Default to the most recent watch unless they specify a watch date or ID.
 
 You have access to these tools:
 - tmdb_search: Search for movies by title (with optional year)
@@ -86,6 +91,7 @@ You have access to these tools:
 - recommend: Get personalized movie recommendations (automatically expands the database if needed - this may take a moment)
 - mark_watched: Record that the family ALREADY watched a movie (with optional rating 1-10 and personal notes)
 - update_rating: Update the rating for a previously watched movie WITHOUT creating a new watch record
+- update_watch: Edit existing watch history entries (change watch dates, update/clear notes, toggle rewatch flag)
 - get_streaming: Get streaming availability information (where to watch: stream, rent, or buy)
 
 IMPORTANT - Handling Delays:
@@ -333,6 +339,23 @@ export async function POST(req: Request) {
               return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to update rating',
+              };
+            }
+          },
+        }),
+
+        update_watch: tool({
+          description:
+            'Edit an existing watch entry for a movie the household has already logged. Use this when the user wants to change the watch date, update or clear notes, or toggle the rewatch flag. Defaults to the most recent watch unless watch_id or original_watched_at are provided. Always call tmdb_search first to confirm the TMDB ID.',
+          parameters: updateWatchSchema,
+          execute: async (input) => {
+            try {
+              const result = await updateWatch(input, householdId, profileId);
+              return result;
+            } catch (error) {
+              return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to update watch entry',
               };
             }
           },

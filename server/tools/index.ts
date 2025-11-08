@@ -20,6 +20,7 @@ export { recommend } from './recommend';
 export { markWatched } from './mark-watched';
 export { getStreaming } from './get-streaming';
 export { updateRating } from './update-rating';
+export { updateWatch } from './update-watch';
 
 // Tool metadata for AI SDK
 export const toolDefinitions = {
@@ -132,6 +133,41 @@ export const toolDefinitions = {
         },
       },
       required: ['tmdb_id', 'rating'],
+    },
+  },
+
+  update_watch: {
+    description:
+      'Edit an existing watch entry for a movie the household has already logged. Use this to change the watch date, update or clear notes, or toggle the rewatch flag. Defaults to the most recent watch unless watch_id or original_watched_at are provided to target a specific entry.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tmdb_id: {
+          type: 'number',
+          description: 'TMDB ID of the movie whose watch entry should be updated',
+        },
+        watch_id: {
+          type: 'number',
+          description: 'Optional watch ID if the specific entry is known',
+        },
+        original_watched_at: {
+          type: 'string',
+          description: 'Optional original watched_at timestamp to target a specific entry (ISO 8601)',
+        },
+        watched_at: {
+          type: 'string',
+          description: 'New watched_at timestamp (ISO 8601) to set on the entry',
+        },
+        notes: {
+          type: 'string',
+          description: 'Updated notes for the watch entry. Send an empty string or null to clear.',
+        },
+        rewatch: {
+          type: 'boolean',
+          description: 'Whether the watch entry should be marked as a rewatch',
+        },
+      },
+      required: ['tmdb_id'],
     },
   },
 } as const;

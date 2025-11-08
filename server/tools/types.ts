@@ -152,6 +152,57 @@ export interface UpdateRatingResult {
 }
 
 // ============================================================================
+// Update Watch Tool
+// ============================================================================
+
+export const updateWatchSchema = z
+  .object({
+    tmdb_id: z.number().int().positive('TMDB ID must be a positive number'),
+    watch_id: z.number().int().positive('Watch ID must be a positive number').optional(),
+    original_watched_at: z
+      .string()
+      .datetime()
+      .optional()
+      .describe('Original watched_at timestamp to identify a specific watch entry'),
+    watched_at: z
+      .string()
+      .datetime()
+      .optional()
+      .describe('New ISO 8601 datetime for the watch entry'),
+    notes: z
+      .union([z.string().max(500), z.null()])
+      .optional()
+      .describe('Updated personal notes. Use null or an empty string to clear the note.'),
+    rewatch: z
+      .boolean()
+      .optional()
+      .describe('Whether this watch entry should be marked as a rewatch'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.watched_at === undefined && data.notes === undefined && data.rewatch === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide at least one field to update (watched_at, notes, or rewatch).',
+        path: ['watched_at'],
+      });
+    }
+  });
+
+export type UpdateWatchInput = z.infer<typeof updateWatchSchema>;
+
+export interface UpdateWatchResult {
+  success: boolean;
+  watch: {
+    id: number;
+    tmdb_id: number;
+    watched_at: string;
+    notes: string | null;
+    rewatch: boolean | null;
+  };
+  message: string;
+}
+
+// ============================================================================
 // Error Types
 // ============================================================================
 
